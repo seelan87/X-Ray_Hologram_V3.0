@@ -1,4 +1,4 @@
-name: Build X-Ray Hologram V3 - Windows 11 x64
+name: Build X-Ray Hologram V20 - Windows 11 x64
 
 on:
   workflow_dispatch:
@@ -41,11 +41,11 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
-      - name: Build GUI-only EXE (no console window)
+      - name: Build EXE from spec
         shell: pwsh
         run: |
           Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
-          python -m PyInstaller --clean --noconfirm --noconsole X-Ray_Hologram_V20.spec
+          python -m PyInstaller --clean --noconfirm X-Ray_Hologram_V20.spec
 
       - name: Find EXE
         shell: pwsh
