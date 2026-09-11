@@ -1,0 +1,11 @@
+# Windows x86 / Python 3.8
+# These versions are intentionally pinned to releases that provide Windows win32 wheels.
+numpy==1.23.5
+scipy==1.9.0
+pandas==1.5.3
+Pillow==9.5.0
+matplotlib==3.7.5
+scikit-image==0.19.3
+h5py==2.10.0
+imageio==2.31.6
+PyInstaller==5.13.2

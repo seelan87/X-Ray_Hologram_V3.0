@@ -1,0 +1,9 @@
+numpy
+scipy
+pandas
+h5py
+Pillow
+matplotlib
+scikit-image
+imageio
+pyinstaller
