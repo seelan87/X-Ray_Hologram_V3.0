@@ -1,8 +1,5 @@
-# PyInstaller specification for X-Ray Hologram V20.
-# Build with the Python architecture you want:
-#   x64 -> build_windows_x64.bat
-#   x86 -> build_windows_x86.bat
-
+# PyInstaller specification for X-Ray Hologram V20
+# Windows x64 build is produced by the 64-bit GitHub Actions runner.
 from PyInstaller.utils.hooks import collect_submodules
 
 hiddenimports = [
@@ -51,6 +48,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+# Explicit one-file executable.
 exe = EXE(
     pyz,
     a.scripts,
