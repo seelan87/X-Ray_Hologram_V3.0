@@ -1,4 +1,4 @@
-name: Build X-Ray Hologram V20 - Windows 11 x64 EXE
+name: Build X-Ray Hologram V20 - Windows 11 x64
 
 on:
   workflow_dispatch:
@@ -17,10 +17,10 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up 64-bit Python
+      - name: Setup Python 3.10 x64
         uses: actions/setup-python@v6
         with:
           python-version: "3.10"
@@ -28,58 +28,79 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - name: Verify 64-bit environment
+      - name: Verify Python is 64-bit
         shell: pwsh
         run: |
           python --version
-          python -c "import platform,struct; print('Architecture:', platform.architecture()[0]); print('Pointer size:', struct.calcsize('P')*8); assert struct.calcsize('P') == 8, 'Python is not 64-bit'"
+          python -c "import struct,platform; print('Python:', platform.python_version()); print('Architecture:', platform.architecture()[0]); print('Bits:', struct.calcsize('P')*8); assert struct.calcsize('P') == 8, 'Python is not 64-bit'"
 
       - name: Install dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -r requirements.txt
-          python -m pip install --upgrade pyinstaller
+          python -m pip install pyinstaller
 
-      - name: Verify scientific packages
+      - name: Build EXE
         shell: pwsh
         run: |
-          python -c "import numpy, scipy, pandas, h5py, PIL, matplotlib, skimage, imageio; print('Required imports: OK')"
-
-      - name: Clean previous build
-        shell: pwsh
-        run: |
-          if (Test-Path build) { Remove-Item build -Recurse -Force }
-          if (Test-Path dist) { Remove-Item dist -Recurse -Force }
-
-      - name: Build x64 EXE
-        shell: pwsh
-        run: |
+          Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
           python -m PyInstaller --clean --noconfirm X-Ray_Hologram_V20.spec
 
-      - name: Verify EXE
+      - name: Find EXE
         shell: pwsh
         run: |
-          $exe = "dist\X-Ray_Hologram_V20\X-Ray_Hologram_V20.exe"
-          if (-not (Test-Path $exe)) {
-            Write-Error "ERROR: x64 EXE was not created."
-            if (Test-Path dist) { Get-ChildItem dist -Recurse | Format-Table FullName,Length }
-            exit 1
+          $exe = Get-ChildItem -Path "dist" -Recurse -Filter "X-Ray_Hologram_V20.exe" -File |
+                 Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $exe) {
+            Write-Host "dist contents:"
+            Get-ChildItem -Path "dist" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object FullName, Length |
+              Format-Table -AutoSize
+            throw "X-Ray_Hologram_V20.exe was not created."
           }
 
-          $size = (Get-Item $exe).Length
-          Write-Host "SUCCESS: $exe"
-          Write-Host ("EXE size: {0:N0} bytes" -f $size)
+          Write-Host "EXE found: $exe"
+          "EXE_PATH=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
 
-      - name: Package x64 EXE
+      - name: Verify EXE is x64
         shell: pwsh
         run: |
+          $exe = $env:EXE_PATH
+          $bytes = [System.IO.File]::ReadAllBytes($exe)
+
+          if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+            throw "Not a Windows PE executable."
+          }
+
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          $signature = [System.Text.Encoding]::ASCII.GetString($bytes, $peOffset, 4)
+
+          if ($signature -ne "PE`0`0") {
+            throw "Invalid PE signature."
+          }
+
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+
+          if ($machine -ne 0x8664) {
+            throw ("EXE is not x64/AMD64. Machine type: 0x{0:X4}" -f $machine)
+          }
+
+          Write-Host "Confirmed: Windows x64 / AMD64 EXE"
+
+      - name: Package EXE
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+          Copy-Item "$env:EXE_PATH" "package\X-Ray_Hologram_V20.exe" -Force
+
           Compress-Archive `
-            -Path "dist\X-Ray_Hologram_V20\*" `
+            -Path "package\X-Ray_Hologram_V20.exe" `
             -DestinationPath "X-Ray_Hologram_V20-Windows-x64.zip" `
             -Force
 
-      - name: Upload x64 EXE
+      - name: Upload EXE artifact
         uses: actions/upload-artifact@v5
         with:
           name: X-Ray_Hologram_V20-Windows-x64
